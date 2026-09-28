@@ -1,0 +1,103 @@
+# Headless governing service of the StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy-manager-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: nginx-proxy-manager
+    app.kubernetes.io/component: db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx-proxy-manager-db
+spec:
+  serviceName: nginx-proxy-manager-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx-proxy-manager
+      app.kubernetes.io/component: db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx-proxy-manager
+        app.kubernetes.io/component: db
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:17
+          envFrom:
+            - secretRef:
+                name: nginx-proxy-manager-db
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: postgres
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+---
+# Only the Nginx Proxy Manager pod may connect to the database.
+# Enforced on clusters with a NetworkPolicy-capable CNI (k3s ships one by default).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-proxy-manager-db
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nginx-proxy-manager
+      app.kubernetes.io/component: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nginx-proxy-manager
+              app.kubernetes.io/component: app
+      ports:
+        - port: postgres
+          protocol: TCP

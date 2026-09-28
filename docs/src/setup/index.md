@@ -180,6 +180,22 @@ for a list of supported architectures and if you want one that doesn't exist,
 Also, if you don't know how to already, follow [this guide to install docker and docker-compose](https://manre-universe.net/how-to-run-docker-and-docker-compose-on-raspbian/)
 on Raspbian.
 
+## Running on Kubernetes / k3s
+
+Kustomize manifests are available in the
+[`k8s` folder](https://github.com/NginxProxyManager/nginx-proxy-manager/tree/develop/k8s)
+of the repository, with overlays for local [kind](https://kind.sigs.k8s.io/) clusters and
+for PostgreSQL. On k3s:
+
+```bash
+kubectl apply -k k8s/base
+```
+
+Read the README in that folder first: Nginx Proxy Manager must run as a single replica,
+k3s's bundled Traefik must be disabled (or moved) so ports 80/443 are free, and upstream
+hosts inside the cluster must be given as fully qualified names
+(`<service>.<namespace>.svc.cluster.local`).
+
 ## Initial Run
 
 After the app is running for the first time, the following will happen:

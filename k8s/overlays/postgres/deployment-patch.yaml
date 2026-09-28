@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-manager
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx-proxy-manager
+          env:
+            - name: DB_POSTGRES_HOST
+              value: nginx-proxy-manager-db
+            - name: DB_POSTGRES_PORT
+              value: "5432"
+            - name: DB_POSTGRES_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-proxy-manager-db
+                  key: POSTGRES_DB
+            - name: DB_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-proxy-manager-db
+                  key: POSTGRES_USER
+            - name: DB_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-proxy-manager-db
+                  key: POSTGRES_PASSWORD
