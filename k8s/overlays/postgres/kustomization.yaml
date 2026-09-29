@@ -1,0 +1,19 @@
+# Runs Nginx Proxy Manager against a PostgreSQL database deployed alongside it.
+#
+# Create postgres.env from postgres.env.example before deploying.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nginx-proxy-manager
+
+resources:
+  - ../../base
+  - postgres.yaml
+
+secretGenerator:
+  - name: nginx-proxy-manager-db
+    envs:
+      - postgres.env
+
+patches:
+  - path: deployment-patch.yaml

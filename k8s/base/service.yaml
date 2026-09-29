@@ -1,0 +1,50 @@
+# Public HTTP/HTTPS entrypoint for proxied hosts.
+#
+# On k3s the bundled ServiceLB (klipper-lb) binds these ports on the node(s).
+# Traefik, which k3s installs by default, also wants 80/443: disable it
+# (--disable traefik) or give this service a different address, e.g. with MetalLB.
+#
+# externalTrafficPolicy: Local keeps the real client IP visible to nginx,
+# which access lists and logs rely on.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy-manager
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: nginx-proxy-manager
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: https
+      protocol: TCP
+    # Add ports for any Streams you configure in the UI here, e.g.:
+    # - name: stream-ftp
+    #   port: 21
+    #   targetPort: 21
+    #   protocol: TCP
+---
+# The admin UI is kept cluster-internal. Reach it with
+#   kubectl -n nginx-proxy-manager port-forward svc/nginx-proxy-manager-admin 8181:81
+# or publish it through a proxy host / Ingress of your choice.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy-manager-admin
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nginx-proxy-manager
+    app.kubernetes.io/component: app
+  ports:
+    - name: admin
+      port: 81
+      targetPort: admin
+      protocol: TCP

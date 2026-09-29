@@ -20,7 +20,9 @@ for FILENAME in $(find /var/run/s6/container_environment/ | grep "__FILE$"); do
 
 		# ... and set value to contents of secretfile
 		# since s6 uses text files, this is effectively "export ..."
-		printf $(cat "${SECRETFILE}") > "${STRIPFILE}"
+		# the value is written verbatim (only trailing newlines are stripped), so
+		# spaces, '%' and backslashes in secrets survive intact
+		printf '%s' "$(cat "${SECRETFILE}")" > "${STRIPFILE}"
 		# echo "[secret-init] Set ${STRIPFILE##*/} to $(cat ${STRIPFILE})"  # DEBUG - rm for prod!"
 		echo "Success: ${STRIPFILE##*/} set from ${FILENAME##*/}"
 

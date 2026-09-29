@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-manager
+spec:
+  # Nginx Proxy Manager keeps its generated nginx configs and certificates on
+  # the /data volume and reloads the local nginx process when they change, so
+  # it cannot be scaled horizontally. Always run exactly one replica.
+  replicas: 1
+  # Recreate ensures the old pod has released the ReadWriteOnce volumes (and
+  # the SQLite database) before the new pod starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx-proxy-manager
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx-proxy-manager
+        app.kubernetes.io/component: app
+    spec:
+      # Kubernetes would otherwise inject <SERVICE>_PORT style variables for
+      # every service in the namespace, which can collide with the image's own
+      # settings (e.g. a service called "npm-admin" produces NPM_ADMIN_PORT).
+      enableServiceLinks: false
+      # The application never talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: nginx-proxy-manager
+          image: jc21/nginx-proxy-manager
+          imagePullPolicy: IfNotPresent
+          # The image uses s6-overlay as init and must start as root. Processes
+          # drop to PUID/PGID after initialisation if those are set.
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          env:
+            - name: TZ
+              value: "UTC"
+            # Most k8s/k3s clusters are IPv4 single-stack. Set this to "false"
+            # on dual-stack clusters.
+            - name: DISABLE_IPV6
+              value: "true"
+            # Optional: create the first admin user non-interactively from a
+            # Secret. See k8s/README.md.
+            - name: INITIAL_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-proxy-manager-admin
+                  key: email
+                  optional: true
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nginx-proxy-manager-admin
+                  key: password
+                  optional: true
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            # Keep in sync with NPM_ADMIN_PORT if you change it
+            - name: admin
+              containerPort: 81
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: letsencrypt
+              mountPath: /etc/letsencrypt
+          # GET /api/ on the admin port only answers once both nginx and the
+          # backend (database migrations, certbot plugin installs) are up.
+          # Allow up to 10 minutes as this can be slow on small devices.
+          startupProbe:
+            httpGet:
+              path: /api/
+              port: admin
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
+          # After start-up only nginx itself is checked: proxied traffic does not
+          # depend on the backend or database, and the image already restarts a
+          # crashed backend on its own.
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: nginx-proxy-manager-data
+        - name: letsencrypt
+          persistentVolumeClaim:
+            claimName: nginx-proxy-manager-letsencrypt

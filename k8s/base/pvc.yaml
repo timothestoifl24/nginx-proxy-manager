@@ -1,0 +1,27 @@
+# Both volumes hold state that must survive pod restarts:
+#   data        -> /data            (database, generated nginx configs, custom certs, logs, JWT keys)
+#   letsencrypt -> /etc/letsencrypt (Let's Encrypt accounts and issued certificates)
+#
+# No storageClassName is set so the cluster default is used
+# (on k3s this is the bundled "local-path" provisioner).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-proxy-manager-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-proxy-manager-letsencrypt
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi

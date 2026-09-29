@@ -1,0 +1,12 @@
+# For local testing on kind (e.g. via Podman Desktop), which has no
+# LoadBalancer implementation. The public service becomes a NodePort on fixed
+# ports that cluster.yaml maps to the host. The admin UI stays cluster-internal
+# (use kubectl port-forward). See k8s/README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+patches:
+  - path: service-patch.yaml

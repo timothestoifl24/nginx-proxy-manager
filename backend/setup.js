@@ -34,7 +34,7 @@ const setupDefaultUser = async () => {
 	const userIsetup = await isSetup();
 	if (!userIsetup) {
 		// Create a new user and set password
-		logger.info(`Creating a new user: ${initialAdminEmail} with password: ${initialAdminPassword}`);
+		logger.info(`Creating a new user: ${initialAdminEmail}`);
 
 		const data = {
 			is_deleted: 0,
